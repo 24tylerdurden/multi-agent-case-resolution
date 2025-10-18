@@ -1,0 +1,92 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+    url = env("DATABASE_URL")
+}
+
+model Customer {
+  id        String   @id
+  name      String
+  email     String   @map("email_masked") // already masked
+  kycLevel  String   @map("kyc_level")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  cards      Card[]
+  transactions Transaction[]
+  alerts     Alert[]
+  cases      Case[]
+}
+
+model Card {
+  id         String   @id
+  customerId String   @map("customer_id")
+  customer   Customer @relation(fields: [customerId], references: [id])
+  last4      String
+  network    String
+  status     String   // "ACTIVE", "FROZEN"
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  transactions Transaction[]
+}
+
+model Transaction {
+  id         String   @id
+  customerId String   @map("customer_id")
+  customer   Customer @relation(fields: [customerId], references: [id])
+  cardId     String?  @map("card_id")
+  card       Card?    @relation(fields: [cardId], references: [id])
+  mcc        String
+  merchant   String
+  amountCents Int     @map("amount_cents")
+  currency   String
+  ts         DateTime @map("ts") // timestamptz
+  deviceId   String?  @map("device_id")
+  country    String?
+  city       String?
+
+  alerts Alert[]
+  cases Case[]
+
+  @@index([customerId, ts], map: "idx_tx_customer_ts")
+  @@index([merchant])
+  @@index([mcc])
+}
+
+model Alert {
+  id           String   @id
+  customerId   String   @map("customer_id")
+  customer     Customer @relation(fields: [customerId], references: [id])
+  suspectTxnId String?  @map("suspect_txn_id")
+  suspectTxn   Transaction? @relation(fields: [suspectTxnId], references: [id])
+  createdAt    DateTime @default(now()) @map("created_at")
+  risk         String
+  status       String   // "open", "resolved"
+}
+
+
+model Case {
+  id          String   @id
+  customerId  String   @map("customer_id")
+  customer    Customer @relation(fields: [customerId], references: [id])
+  txnId       String?  @map("txn_id")
+  txn         Transaction? @relation(fields: [txnId], references: [id])
+  type        String   // "DISPUTE", "FRAUD"
+  status      String   // "OPEN", "CLOSED"
+  reasonCode  String?  @map("reason_code")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  events CaseEvent[]
+}
+
+model CaseEvent {
+  id        String   @id
+  caseId    String   @map("case_id")
+  case      Case     @relation(fields: [caseId], references: [id])
+  ts        DateTime @default(now())
+  actor     String   // "agent", "system"
+  action    String   // "freeze_card", "open_dispute"
+  payload   Json     @map("payload_json")
+}
