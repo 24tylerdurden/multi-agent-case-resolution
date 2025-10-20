@@ -29,7 +29,20 @@ services:
       - redis
     volumes:
       - ./api:/app
+      - ./fixtures:/app/fixtures
       - /app/node_modules
+
+  web:
+    build: ./web
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+    environment:
+      VITE_API_BASE: http://api:3001
+    volumes:
+      - ./web:/web
+      - /web/node_modules
 
 volumes:
   pgdata:

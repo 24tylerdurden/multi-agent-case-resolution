@@ -1,0 +1,40 @@
+{
+    "evalCases": [
+      {
+        "id": "freeze-otp-path",
+        "description": "Freeze with OTP requirement",
+        "input": {
+          "alertId": 123,
+          "customerId": 456,
+          "transaction": {
+            "amount": 499900,
+            "merchant": "Suspicious Merchant",
+            "country": "CN"
+          }
+        },
+        "expected": {
+          "recommendation": "Freeze Card",
+          "otpRequired": true,
+          "finalStatus": "FROZEN"
+        }
+      },
+      {
+        "id": "dispute-creation",
+        "description": "Unrecognized transaction dispute",
+        "input": {
+          "alertId": 124,
+          "customerId": 457,
+          "transaction": {
+            "amount": 499900,
+            "merchant": "ABC Mart",
+            "mcc": "5411"
+          }
+        },
+        "expected": {
+          "recommendation": "Open Dispute",
+          "reasonCode": "10.4",
+          "caseStatus": "OPEN"
+        }
+      }
+    ]
+  }

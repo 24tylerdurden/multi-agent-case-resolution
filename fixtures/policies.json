@@ -1,0 +1,20 @@
+[
+  {
+    "id": 1,
+    "code": "OTP_REQUIRED",
+    "title": "OTP Verification Required",
+    "content_text": "For transactions over $500 or foreign transactions, OTP verification is mandatory."
+  },
+  {
+    "id": 2,
+    "code": "FREEZE_LIMIT",
+    "title": "Card Freeze Limits",
+    "content_text": "Maximum 3 card freezes per customer per month. Lead approval required for additional freezes."
+  },
+  {
+    "id": 3,
+    "code": "DISPUTE_AMOUNT",
+    "title": "Dispute Amount Thresholds",
+    "content_text": "Disputes over $5000 require additional documentation and lead approval."
+  }
+]

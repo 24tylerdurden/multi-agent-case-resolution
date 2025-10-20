@@ -1,0 +1,20 @@
+[
+  {
+    "id": 1,
+    "title": "Dispute Process Guide",
+    "anchor": "dispute-process",
+    "content_text": "Customers have 60 days from transaction date to file a dispute. Requires transaction details and reason code."
+  },
+  {
+    "id": 2,
+    "title": "Card Freeze Policy",
+    "anchor": "card-freeze",
+    "content_text": "Cards can be frozen temporarily for suspected fraud. OTP verification required for high-risk freezes."
+  },
+  {
+    "id": 3,
+    "title": "Risk Assessment Criteria",
+    "anchor": "risk-criteria",
+    "content_text": "Risk scores consider transaction velocity, location changes, merchant risk, and historical patterns."
+  }
+]

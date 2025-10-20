@@ -13,6 +13,12 @@
     "express": "^5.1.0"
   },
   "scripts": {
-    "dev": "tsx watch src/index.js"
+    "dev": "tsx watch src/index.ts",
+    "prisma:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "seed:generate": "node ./fixtures/scripts/generate-data.js && node ./fixtures/scripts/transaction-generator.js && node ./fixtures/scripts/generator-alert-policies.js",
+    "db:seed": "node scripts/seed.js",
+    "seed:all": "npm run seed:generate && npm run db:seed",
+    "seed:large": "node ./fixtures/scripts/transaction-generator.js --size 5000000"
   }
 }

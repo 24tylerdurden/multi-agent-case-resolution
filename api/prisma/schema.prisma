@@ -14,10 +14,13 @@ model Customer {
   kycLevel  String   @map("kyc_level")
   createdAt DateTime @default(now()) @map("created_at")
 
-  cards      Card[]
+  cards        Card[]
   transactions Transaction[]
-  alerts     Alert[]
-  cases      Case[]
+  alerts       Alert[]
+  cases        Case[]
+  accounts     Account[]
+
+  @@map("customers")
 }
 
 model Card {
@@ -30,63 +33,132 @@ model Card {
   createdAt  DateTime @default(now()) @map("created_at")
 
   transactions Transaction[]
+
+  @@map("cards")
 }
 
 model Transaction {
-  id         String   @id
-  customerId String   @map("customer_id")
-  customer   Customer @relation(fields: [customerId], references: [id])
-  cardId     String?  @map("card_id")
-  card       Card?    @relation(fields: [cardId], references: [id])
-  mcc        String
-  merchant   String
-  amountCents Int     @map("amount_cents")
-  currency   String
-  ts         DateTime @map("ts") // timestamptz
-  deviceId   String?  @map("device_id")
-  country    String?
-  city       String?
+  id          String    @id
+  customerId  String    @map("customer_id")
+  customer    Customer  @relation(fields: [customerId], references: [id])
+  cardId      String?   @map("card_id")
+  card        Card?     @relation(fields: [cardId], references: [id])
+  mcc         String
+  merchant    String
+  amountCents Int       @map("amount_cents")
+  currency    String
+  ts          DateTime  @map("ts") // timestamptz
+  deviceId    String?   @map("device_id")
+  country     String?
+  city        String?
 
   alerts Alert[]
-  cases Case[]
+  cases  Case[]
 
   @@index([customerId, ts], map: "idx_tx_customer_ts")
   @@index([merchant])
   @@index([mcc])
+  @@index([customerId, merchant], map: "idx_tx_customer_merchant")
+
+  @@map("transactions")
 }
 
 model Alert {
-  id           String   @id
-  customerId   String   @map("customer_id")
-  customer     Customer @relation(fields: [customerId], references: [id])
-  suspectTxnId String?  @map("suspect_txn_id")
+  id           String       @id
+  customerId   String       @map("customer_id")
+  customer     Customer     @relation(fields: [customerId], references: [id])
+  suspectTxnId String?      @map("suspect_txn_id")
   suspectTxn   Transaction? @relation(fields: [suspectTxnId], references: [id])
-  createdAt    DateTime @default(now()) @map("created_at")
+  createdAt    DateTime     @default(now()) @map("created_at")
   risk         String
   status       String   // "open", "resolved"
+
+  triageRuns   TriageRun[]
+
+  @@map("alerts")
 }
 
-
 model Case {
-  id          String   @id
-  customerId  String   @map("customer_id")
-  customer    Customer @relation(fields: [customerId], references: [id])
-  txnId       String?  @map("txn_id")
+  id          String    @id
+  customerId  String    @map("customer_id")
+  customer    Customer  @relation(fields: [customerId], references: [id])
+  txnId       String?   @map("txn_id")
   txn         Transaction? @relation(fields: [txnId], references: [id])
-  type        String   // "DISPUTE", "FRAUD"
-  status      String   // "OPEN", "CLOSED"
-  reasonCode  String?  @map("reason_code")
-  createdAt   DateTime @default(now()) @map("created_at")
+  type        String    // "DISPUTE", "FRAUD"
+  status      String    // "OPEN", "CLOSED"
+  reasonCode  String?   @map("reason_code")
+  createdAt   DateTime  @default(now()) @map("created_at")
 
   events CaseEvent[]
+
+  @@map("cases")
 }
 
 model CaseEvent {
-  id        String   @id
+  id        String   @id @default(cuid())
   caseId    String   @map("case_id")
   case      Case     @relation(fields: [caseId], references: [id])
   ts        DateTime @default(now())
   actor     String   // "agent", "system"
   action    String   // "freeze_card", "open_dispute"
   payload   Json     @map("payload_json")
+
+  @@map("case_events")
+}
+
+model Account {
+  id            String   @id
+  customerId    String   @map("customer_id")
+  customer      Customer @relation(fields: [customerId], references: [id])
+  balanceCents  Int      @map("balance_cents")
+  currency      String
+
+  @@map("accounts")
+}
+
+model TriageRun {
+  id           String    @id
+  alertId      String    @map("alert_id")
+  alert        Alert     @relation(fields: [alertId], references: [id])
+  startedAt    DateTime  @default(now()) @map("started_at")
+  endedAt      DateTime? @map("ended_at")
+  risk         String?
+  reasons      Json?     @map("reasons")
+  fallbackUsed Boolean   @default(false) @map("fallback_used")
+  latencyMs    Int?      @map("latency_ms")
+
+  traces AgentTrace[]
+
+  @@map("triage_runs")
+}
+
+model AgentTrace {
+  runId      String    @map("run_id")
+  seq        Int
+  run        TriageRun @relation(fields: [runId], references: [id])
+  step       String
+  ok         Boolean
+  durationMs Int       @map("duration_ms")
+  detail     Json      @map("detail_json")
+
+  @@id([runId, seq])
+  @@map("agent_traces")
+}
+
+model KbDoc {
+  id      String @id
+  title   String
+  anchor  String
+  content String  @map("content_text")
+
+  @@map("kb_docs")
+}
+
+model Policy {
+  id      String @id
+  code    String
+  title   String
+  content String @map("content_text")
+
+  @@map("policies")
 }
