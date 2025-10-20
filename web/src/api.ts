@@ -34,7 +34,45 @@ export async function fetchInsights(customerId: string, days = 180): Promise<Ins
 }
 
 export async function startTriage(alertId: string): Promise<{ runId: string; alertId: string }> {
-  const r = await fetch('/api/triage', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ alertId }) });
+  const r = await fetch('/api/triage', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ alertId })
+  });
+  if (r.status === 429) {
+    const retryAfterHeader = r.headers.get('Retry-After');
+    let retryAfterMs = retryAfterHeader ? parseInt(retryAfterHeader, 10) * 1000 : undefined;
+    try {
+      const j = await r.json();
+      if (typeof j?.retryAfterMs === 'number') retryAfterMs = j.retryAfterMs;
+    } catch {}
+    const err: any = new Error('rate_limited');
+    err.code = 429;
+    err.retryAfterMs = retryAfterMs ?? 3000;
+    throw err;
+  }
+  if (!r.ok) throw new Error('failed_triage');
+  return r.json();
+}
+
+export async function startTriageWithOptions(alertId: string, opts?: { simulateRiskFail?: boolean }): Promise<{ runId: string; alertId: string }> {
+  const r = await fetch('/api/triage', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ alertId, simulateRiskFail: !!opts?.simulateRiskFail })
+  });
+  if (r.status === 429) {
+    const retryAfterHeader = r.headers.get('Retry-After');
+    let retryAfterMs = retryAfterHeader ? parseInt(retryAfterHeader, 10) * 1000 : undefined;
+    try {
+      const j = await r.json();
+      if (typeof j?.retryAfterMs === 'number') retryAfterMs = j.retryAfterMs;
+    } catch {}
+    const err: any = new Error('rate_limited');
+    err.code = 429;
+    err.retryAfterMs = retryAfterMs ?? 3000;
+    throw err;
+  }
   if (!r.ok) throw new Error('failed_triage');
   return r.json();
 }
@@ -64,5 +102,15 @@ export async function kbSearch(q: string): Promise<{ results: { docId: string; t
   url.searchParams.set('q', q);
   const r = await fetch(url);
   if (!r.ok) throw new Error('failed_kb');
+  return r.json();
+}
+
+export async function updateAlertStatus(alertId: string, status: 'open' | 'resolved') {
+  const r = await fetch(`/api/alerts/${encodeURIComponent(alertId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status })
+  });
+  if (!r.ok) throw new Error('failed_update_alert');
   return r.json();
 }

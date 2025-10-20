@@ -25,4 +25,24 @@ router.get('/', async (req, res) => {
   res.json({ items, nextCursor });
 });
 
+// PATCH /api/alerts/:id { status: "open" | "resolved" }
+router.patch('/:id', async (req, res) => {
+  try {
+    const id = String(req.params.id);
+    const { status } = req.body || {};
+    if (status !== 'open' && status !== 'resolved') {
+      return res.status(400).json({ error: 'invalid_status' });
+    }
+    const updated = await prisma.alert.update({
+      where: { id },
+      data: { status },
+      select: { id: true, customerId: true, suspectTxnId: true, createdAt: true, risk: true, status: true }
+    });
+    res.json(updated);
+  } catch (e: any) {
+    if (e?.code === 'P2025') return res.status(404).json({ error: 'not_found' });
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
 export default router;

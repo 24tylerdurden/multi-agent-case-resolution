@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import prisma from '../lib/prisma';
 import hub, { TriageEvent } from '../lib/triageHub';
+import { getRedis } from '../lib/redis';
 
 const router = Router();
 
@@ -11,6 +12,24 @@ router.post('/', async (req, res) => {
   try {
     const { alertId } = req.body || {};
     if (!alertId) return res.status(400).json({ error: 'alertId required' });
+
+    // Rate limit per alertId to avoid spam triage
+    try {
+      const redis = await getRedis();
+      const key = `triage:cooldown:${alertId}`;
+      // TTL for 5 minutes
+      const ttlSeconds = 5;
+      const set = await redis.set(key, '1', { NX: true, EX: ttlSeconds });
+      if (set !== 'OK') {
+        const pttl = await redis.pTTL(key);
+        const ms = Math.max(0, pttl);
+        const sec = Math.ceil(ms / 1000);
+        res.setHeader('Retry-After', String(sec));
+        return res.status(429).json({ error: 'rate_limited', retryAfterMs: ms });
+      }
+    } catch (e) {
+      // If Redis not available, do not block; proceed without rate limit
+    }
 
     // Create run record
     const runId = `run_${Date.now()}_${Math.floor(Math.random()*1e6)}`;
@@ -27,10 +46,11 @@ router.post('/', async (req, res) => {
     }, 50);
 
     setTimeout(async () => {
-      // Simulate risk tool; sometimes timeout triggers fallback
-      const fail = Math.random() < 0.1; // 10% failure to show fallback path
+      // Simulate risk tool; support forced failure via request body, otherwise 15% failure
+      const forcedFail = !!(req.body && req.body.simulateRiskFail);
+      const fail = forcedFail || (Math.random() < 0.15);
       if (fail) {
-        const evF: TriageEvent = { type: 'fallback_triggered', ts: nowIso(), data: { tool: 'riskSignals', reason: 'timeout' } };
+        const evF: TriageEvent = { type: 'fallback_triggered', ts: nowIso(), data: { tool: 'riskSignals', reason: 'risk_unavailable' } };
         hub.emit(runId, evF);
         await prisma.agentTrace.create({ data: { runId, seq: 2, step: evF.type, ok: true, durationMs: 900, detail: evF.data } });
         await prisma.triageRun.update({ where: { id: runId }, data: { fallbackUsed: true } });
@@ -42,10 +62,19 @@ router.post('/', async (req, res) => {
     }, 300);
 
     setTimeout(async () => {
-      const ev3: TriageEvent = { type: 'decision_finalized', ts: nowIso(), data: { recommended: 'FREEZE_CARD', risk: 'HIGH' } };
-      hub.emit(runId, ev3);
-      await prisma.agentTrace.create({ data: { runId, seq: 3, step: ev3.type, ok: true, durationMs: 40, detail: ev3.data } });
-      await prisma.triageRun.update({ where: { id: runId }, data: { endedAt: new Date(), risk: 'HIGH', reasons: { recommended: 'FREEZE_CARD' }, latencyMs: 500 } });
+      // Finalize decision based on whether fallback was used
+      const run = await prisma.triageRun.findUnique({ where: { id: runId } });
+      if (run?.fallbackUsed) {
+        const ev3: TriageEvent = { type: 'decision_finalized', ts: nowIso(), data: { recommended: 'MONITOR', risk: 'MEDIUM', reasons: ['risk_unavailable'] } };
+        hub.emit(runId, ev3);
+        await prisma.agentTrace.create({ data: { runId, seq: 3, step: ev3.type, ok: true, durationMs: 40, detail: ev3.data } });
+        await prisma.triageRun.update({ where: { id: runId }, data: { endedAt: new Date(), risk: 'MEDIUM', reasons: { fallback: true, reason: 'risk_unavailable' }, latencyMs: 500 } });
+      } else {
+        const ev3: TriageEvent = { type: 'decision_finalized', ts: nowIso(), data: { recommended: 'FREEZE_CARD', risk: 'HIGH' } };
+        hub.emit(runId, ev3);
+        await prisma.agentTrace.create({ data: { runId, seq: 3, step: ev3.type, ok: true, durationMs: 40, detail: ev3.data } });
+        await prisma.triageRun.update({ where: { id: runId }, data: { endedAt: new Date(), risk: 'HIGH', reasons: { recommended: 'FREEZE_CARD' }, latencyMs: 500 } });
+      }
     }, 600);
 
     res.json({ runId, alertId });

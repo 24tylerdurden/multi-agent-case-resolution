@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Alert, fetchAlerts } from '../api'
+import { Alert, fetchAlerts, updateAlertStatus } from '../api'
 import { Link } from 'react-router-dom'
 import TriageDrawer from '../components/TriageDrawer'
 
@@ -10,6 +10,8 @@ export default function Alerts() {
   const [triageAlertId, setTriageAlertId] = useState<string | null>(null)
   const [riskFilter, setRiskFilter] = useState<string>('')
   const [statusFilter, setStatusFilter] = useState<string>('')
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const [cooldowns, setCooldowns] = useState<Record<string, number>>({}) // alertId -> epoch ms when enabled again
 
   async function load(next?: boolean) {
     setLoading(true)
@@ -26,6 +28,37 @@ export default function Alerts() {
   const visible = useMemo(() => items.filter(i => (
     (!riskFilter || i.risk === riskFilter) && (!statusFilter || i.status === statusFilter)
   )), [items, riskFilter, statusFilter])
+
+  async function setStatus(id: string, status: 'open'|'resolved') {
+    try {
+      setUpdatingId(id)
+      await updateAlertStatus(id, status)
+      setItems(prev => prev.map(a => a.id === id ? { ...a, status } : a))
+    } finally {
+      setUpdatingId(null)
+    }
+  }
+
+  function onRateLimit(alertId: string, retryAfterMs: number) {
+    const until = Date.now() + retryAfterMs
+    setCooldowns(prev => ({ ...prev, [alertId]: until }))
+    // Clear after timeout to re-enable
+    setTimeout(() => {
+      setCooldowns(prev => {
+        const copy = { ...prev }
+        if (copy[alertId] && copy[alertId] <= Date.now()) delete copy[alertId]
+        return copy
+      })
+    }, retryAfterMs + 50)
+  }
+
+  function cooldownLabel(alertId: string): string | null {
+    const until = cooldowns[alertId]
+    if (!until) return null
+    const remaining = Math.max(0, until - Date.now())
+    const secs = Math.ceil(remaining / 1000)
+    return `Try in ${secs}s`
+  }
 
   return (
     <div className="space-y-3">
@@ -54,7 +87,17 @@ export default function Alerts() {
               <Link className="underline" to={`/customer/${a.customerId}`}>View Customer</Link>
             </div>
             <div className="flex gap-2">
-              <button className="px-3 py-1 bg-black text-white rounded" onClick={() => setTriageAlertId(a.id)}>Open Triage</button>
+              <button
+                className="px-3 py-1 bg-black text-white rounded disabled:opacity-50"
+                disabled={!!triageAlertId || !!cooldowns[a.id]}
+                title={cooldownLabel(a.id) || ''}
+                onClick={() => setTriageAlertId(a.id)}
+              >{cooldownLabel(a.id) || 'Open Triage'}</button>
+              {a.status !== 'resolved' ? (
+                <button disabled={updatingId===a.id} onClick={()=>setStatus(a.id, 'resolved')} className="px-3 py-1 border rounded disabled:opacity-50">{updatingId===a.id ? 'Resolving...' : 'Resolve'}</button>
+              ) : (
+                <button disabled={updatingId===a.id} onClick={()=>setStatus(a.id, 'open')} className="px-3 py-1 border rounded disabled:opacity-50">{updatingId===a.id ? 'Reopening...' : 'Reopen'}</button>
+              )}
             </div>
           </div>
         ))}
@@ -65,7 +108,7 @@ export default function Alerts() {
         <button disabled={!cursor || loading} onClick={() => load(true)} className="px-3 py-1 border rounded disabled:opacity-50">{loading ? 'Loading...' : (cursor ? 'Load more' : 'No more')}</button>
       </div>
       {triageAlertId && (
-        <TriageDrawer alertId={triageAlertId} onClose={() => setTriageAlertId(null)} />
+        <TriageDrawer alertId={triageAlertId} onClose={() => setTriageAlertId(null)} onRateLimit={(ms)=>{ if (triageAlertId) onRateLimit(triageAlertId, ms) }} />
       )}
     </div>
   )

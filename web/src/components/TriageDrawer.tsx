@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
-import { actionFreezeCard, actionOpenDispute, startTriage } from '../api'
+import { actionFreezeCard, actionOpenDispute, startTriageWithOptions } from '../api'
 
-export default function TriageDrawer({ alertId, onClose }: { alertId: string, onClose: () => void }) {
+export default function TriageDrawer({ alertId, onClose, onRateLimit }: { alertId: string, onClose: () => void, onRateLimit?: (retryAfterMs: number) => void }) {
   const [open, setOpen] = useState(true)
   const [runId, setRunId] = useState<string | null>(null)
   const [events, setEvents] = useState<any[]>([])
@@ -9,6 +9,7 @@ export default function TriageDrawer({ alertId, onClose }: { alertId: string, on
   const [freezeStatus, setFreezeStatus] = useState<string | null>(null)
   const [otp, setOtp] = useState('')
   const [cardId, setCardId] = useState('')
+  const [simulateFail, setSimulateFail] = useState(false)
 
   const liveRef = useRef<HTMLDivElement>(null)
   const startedRef = useRef(false)
@@ -19,14 +20,25 @@ export default function TriageDrawer({ alertId, onClose }: { alertId: string, on
       if (startedRef.current) return
       startedRef.current = true
       if (esRef.current) { esRef.current.close(); esRef.current = null }
-      const { runId } = await startTriage(alertId)
-      setRunId(runId)
-      const es = new EventSource(`/api/triage/${runId}/stream`)
-      esRef.current = es
-      es.addEventListener('plan_built', (e: any) => addEvent('plan_built', e))
-      es.addEventListener('tool_update', (e: any) => addEvent('tool_update', e))
-      es.addEventListener('fallback_triggered', (e: any) => addEvent('fallback_triggered', e))
-      es.addEventListener('decision_finalized', (e: any) => addEvent('decision_finalized', e))
+      try {
+        const { runId } = await startTriageWithOptions(alertId, { simulateRiskFail: simulateFail })
+        setRunId(runId)
+        const es = new EventSource(`/api/triage/${runId}/stream`)
+        esRef.current = es
+        es.addEventListener('plan_built', (e: any) => addEvent('plan_built', e))
+        es.addEventListener('tool_update', (e: any) => addEvent('tool_update', e))
+        es.addEventListener('fallback_triggered', (e: any) => addEvent('fallback_triggered', e))
+        es.addEventListener('decision_finalized', (e: any) => addEvent('decision_finalized', e))
+      } catch (e: any) {
+        if (e?.code === 429) {
+          if (onRateLimit) onRateLimit(e.retryAfterMs ?? 3000)
+          // Close immediately and prevent stream setup
+          setOpen(false)
+          onClose()
+          return
+        }
+        throw e
+      }
     }
     function addEvent(type: string, e: MessageEvent) {
       try {
@@ -38,7 +50,7 @@ export default function TriageDrawer({ alertId, onClose }: { alertId: string, on
     }
     init()
     return () => { if (esRef.current) { esRef.current.close(); esRef.current = null } }
-  }, [alertId])
+  }, [alertId, simulateFail])
 
   useEffect(() => { 
     // Reset state when alert changes and allow re-initialization
@@ -97,12 +109,16 @@ export default function TriageDrawer({ alertId, onClose }: { alertId: string, on
             <div className="text-sm text-gray-600">Actions</div>
             <div className="flex gap-2">
               <input aria-label="Card ID" value={cardId} onChange={(e: ChangeEvent<HTMLInputElement>)=>setCardId(e.target.value)} placeholder="Card ID" className="border px-2 py-1 rounded" />
-              <input aria-label="OTP" value={otp} onChange={(e: ChangeEvent<HTMLInputElement>)=>setOtp(e.target.value)} placeholder="OTP (123456)" className="border px-2 py-1 rounded" />
+              <input aria-label="OTP" value={otp} onChange={(e: ChangeEvent<HTMLInputElement>)=>setOtp(e.target.value)} placeholder="OTP" className="border px-2 py-1 rounded" />
               <button onClick={onFreeze} className="px-3 py-1 bg-black text-white rounded">Freeze Card</button>
               <button onClick={onOpenDispute} className="px-3 py-1 border rounded">Open Dispute</button>
             </div>
-            {freezeStatus && <div className="text-sm">Freeze status: <b>{freezeStatus}</b></div>}
+            <label className="flex items-center gap-2 text-xs text-gray-600">
+              <input type="checkbox" checked={simulateFail} onChange={(e)=>setSimulateFail(e.target.checked)} />
+              Simulate riskSignals failure
+            </label>
           </section>
+          {freezeStatus && <div className="text-sm">Freeze status: <b>{freezeStatus}</b></div>}
         </div>
         <div className="sr-only" aria-live="polite" ref={liveRef} />
       </div>
