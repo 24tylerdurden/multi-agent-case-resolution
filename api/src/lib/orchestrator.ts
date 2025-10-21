@@ -1,7 +1,7 @@
 // lib/orchestrator.ts
 import { redactPII } from './redactor';
 import { getProfile } from '../agents/profile';
-import { getRecentTx } from '../agents/tx';
+import { analyzeRecentTransactions } from '../agents/tx';
 import { runRiskSignals } from '../agents/risk';
 import { lookupKB } from '../agents/kb';
 import { decideAction } from '../agents/decider';
@@ -70,14 +70,17 @@ export async function executeTriagePlan(runId: string, alertId: string, customer
 
   // Execute steps
   const profile = await step('getProfile', () => getProfile(customerId));
-  const recentTx = await step('recentTx', () => getRecentTx(customerId, 90));
-  const risk = await step('riskSignals', () => runRiskSignals((alert as any).suspectTxnId, (recentTx as any[]) || []), () => ({ score: 0.4, reasons: ['risk_unavailable'], action: null } as any));
+  const recentTx = await step('recentTx', () => analyzeRecentTransactions(customerId, 90));
+  const since = new Date();
+  since.setDate(since.getDate() - 90);
+  const recentRaw = await prisma.transaction.findMany({ where: { customerId, ts: { gte: since } }, orderBy: { ts: 'desc' } });
+  const risk = await step('riskSignals', () => runRiskSignals((alert as any).suspectTxnId, recentRaw || []), () => ({ score: 0.4, reasons: ['risk_unavailable'], action: null } as any));
   const kb = await step('kbLookup', () => lookupKB(((risk as any)?.reasons || []).join(' ')), () => [] as any);
 
   // Decision
-  const decision = await step('decide', () => decideAction(risk as any, (recentTx as any[]) || [], kb as any), () => ({
-    recommended: 'MONITOR',
-    risk: 'MEDIUM',
+  const decision = await step('decide', () => decideAction(risk as any, recentRaw || [], kb as any), () => ({
+    recommended: 'MONITOR' as const,
+    risk: 'MEDIUM' as const,
     reasons: ['fallback_used']
   }));
 
