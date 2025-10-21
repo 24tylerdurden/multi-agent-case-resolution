@@ -13,5 +13,5 @@ export async function lookupKB(query: string): Promise<Array<{ title: string; an
     WHERE ${conditions}
     LIMIT 3
   `);
-  return results;
+  return results as Array<{title: string, anchor: string, extract: string}
 }
