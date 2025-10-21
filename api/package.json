@@ -11,7 +11,8 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
-    "redis": "^4.7.1"
+    "redis": "^4.7.1",
+    "zod": "^4.1.12"
   },
   "scripts": {
     "dev": "tsx watch src/index.ts",
