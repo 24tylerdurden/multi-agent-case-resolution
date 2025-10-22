@@ -65,11 +65,11 @@ export default function Alerts() {
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Alerts</h2>
         <div className="flex gap-2">
-          <select aria-label="Risk" value={riskFilter} onChange={(e)=>setRiskFilter(e.target.value)} className="px-2 py-1 border rounded text-sm">
+          <select aria-label="Risk" value={riskFilter} onChange={(e)=>setRiskFilter(e.target.value)} className="px-2 py-1 border bg-white rounded text-sm">
             <option value="">All Risks</option>
             {risks.map(r=> <option key={r} value={r}>{r}</option>)}
           </select>
-          <select aria-label="Status" value={statusFilter} onChange={(e)=>setStatusFilter(e.target.value)} className="px-2 py-1 border rounded text-sm">
+          <select aria-label="Status" value={statusFilter} onChange={(e)=>setStatusFilter(e.target.value)} className="px-2 py-1 bg-white border rounded text-sm">
             <option value="">All Statuses</option>
             {statuses.map(s=> <option key={s} value={s}>{s}</option>)}
           </select>

@@ -108,8 +108,8 @@ export default function TriageDrawer({ alertId, onClose, onRateLimit }: { alertI
           <section className="space-y-2">
             <div className="text-sm text-gray-600">Actions</div>
             <div className="flex gap-2">
-              <input aria-label="Card ID" value={cardId} onChange={(e: ChangeEvent<HTMLInputElement>)=>setCardId(e.target.value)} placeholder="Card ID" className="border px-2 py-1 rounded" />
-              <input aria-label="OTP" value={otp} onChange={(e: ChangeEvent<HTMLInputElement>)=>setOtp(e.target.value)} placeholder="OTP" className="border px-2 py-1 rounded" />
+              <input aria-label="Card ID" value={cardId} onChange={(e: ChangeEvent<HTMLInputElement>)=>setCardId(e.target.value)} placeholder="Card ID" className="border bg-white px-2 py-1 rounded" />
+              <input aria-label="OTP" value={otp} onChange={(e: ChangeEvent<HTMLInputElement>)=>setOtp(e.target.value)} placeholder="OTP" className="border bg-white px-2 py-1 rounded" />
               <button onClick={onFreeze} className="px-3 py-1 bg-black text-white rounded">Freeze Card</button>
               <button onClick={onOpenDispute} className="px-3 py-1 border rounded">Open Dispute</button>
             </div>
