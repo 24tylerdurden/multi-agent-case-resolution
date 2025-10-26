@@ -9,8 +9,20 @@ router.get('/', async (req, res) => {
   const limit = Math.min(parseInt(String(req.query.limit || '50'), 10) || 50, 200);
   const cursor = req.query.cursor ? String(req.query.cursor) : undefined;
 
-  const where: any = {};
-  if (cursor) {
+  let fetchAllActiveAlerts: boolean = req.query.totalActiveAlerts ? true: false
+
+  if (fetchAllActiveAlerts) {
+    const count = await prisma.alert.count({
+      where: {
+        status: {not: 'RESOLVED'}
+      }
+    });
+
+    return res.status(200).json({count})
+  }
+
+  let where: any = {};
+  if (cursor && fetchAllActiveAlerts) {
     where.id = { lt: cursor };
   }
 

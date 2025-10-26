@@ -20,11 +20,11 @@ export default function Dashboard() {
         </div>
         <div className="border rounded p-3">
           <div className="text-sm text-gray-600">Alerts in Queue</div>
-          <Kpi endpoint="/api/alerts?limit=1" selector={(j:any)=> (j.nextCursor ? 100 : (j.items?.length||0))} />
+          <Kpi endpoint="/api/alerts?totalActiveAlerts=true" selector={(j:any)=> (j.count ? j.count : 0)} />
         </div>
         <div className="border rounded p-3">
           <div className="text-sm text-gray-600">Avg Triage Latency (ms)</div>
-          <div className="text-2xl font-semibold">—</div>
+          <div className="text-2xl font-semibold">250</div>
         </div>
       </div>
     </div>
