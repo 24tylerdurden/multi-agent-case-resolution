@@ -14,7 +14,7 @@ router.get('/', async (req, res) => {
   if (fetchAllActiveAlerts) {
     const count = await prisma.alert.count({
       where: {
-        status: {not: 'RESOLVED'}
+        status: {notIn: ['RESOLVED', 'resolved']}
       }
     });
 
